@@ -145,6 +145,23 @@ Supabase gebruikt **PgBouncer** voor connection pooling:
 
 Prisma heeft de `directUrl` nodig omdat sommige operaties (zoals migraties) niet compatibel zijn met connection poolers.
 
+## Supabase Auth Trigger Setup
+
+Na het deployen van de Prisma schema, moet je een database trigger instellen in Supabase om automatisch gebruikersprofielen aan te maken wanneer gebruikers zich registreren via Supabase Auth.
+
+Zie [docs/supabase-setup.md](docs/supabase-setup.md) voor gedetailleerde instructies over:
+- Het instellen van de database trigger
+- Email bevestiging instellingen
+- Environment variables configuratie
+
+### Snelle Setup
+
+1. Deploy naar Render
+2. Voer de SQL trigger uit in Supabase SQL Editor (zie `docs/supabase-setup.md`)
+3. Test het aanmelden van een nieuwe gebruiker
+4. Verifieer dat de gebruiker wordt aangemaakt in zowel `auth.users` als `public.users` tabellen
+5. Test het inloggen met de nieuwe gebruiker
+
 ### Troubleshooting
 
 - **Build faalt**: Check de build logs in het Render dashboard
