@@ -43,6 +43,30 @@ async function main() {
     }
   })
 
+  // Demo accounts for easy testing
+  const demoAdminPassword = await bcrypt.hash('Admin123!', 12)
+  const demoClientPassword = await bcrypt.hash('Client123!', 12)
+
+  const demoAdmin = await prisma.user.create({
+    data: {
+      email: 'demo@admin.com',
+      password: demoAdminPassword,
+      firstName: 'Demo',
+      lastName: 'Admin',
+      role: 'ADMIN'
+    }
+  })
+
+  const demoClient = await prisma.user.create({
+    data: {
+      email: 'demo@client.com',
+      password: demoClientPassword,
+      firstName: 'Demo',
+      lastName: 'Client',
+      role: 'STUDENT'
+    }
+  })
+
   const studentUser = await prisma.user.create({
     data: {
       email: 'student@example.com',
@@ -505,6 +529,14 @@ Na deze les kun je een oefentest doen om je kennis te testen!`,
     }
   })
 
+  await prisma.enrollment.create({
+    data: {
+      userId: demoClient.id,
+      courseId: autoTheorieCourse.id,
+      status: 'ACTIVE'
+    }
+  })
+
   // Create progress for student
   await Promise.all([
     prisma.progress.create({
@@ -614,11 +646,11 @@ Na deze les kun je een oefentest doen om je kennis te testen!`,
 
   console.log('✅ Database seeded successfully!')
   console.log(`Created:`)
-  console.log(`- 3 users (1 admin, 2 students)`)
+  console.log(`- 6 users (3 admins, 3 students)`)
   console.log(`- 2 courses (Auto & Motor Theorie)`)
   console.log(`- 9 lessons total`)
   console.log(`- 9 practice questions`)
-  console.log(`- 3 enrollments`)
+  console.log(`- 4 enrollments`)
   console.log(`- 4 progress records`)
   console.log(`- 3 exam results`)
   console.log(`- 3 invoices`)
