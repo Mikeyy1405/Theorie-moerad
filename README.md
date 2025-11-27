@@ -2,16 +2,38 @@
 
 Theorie examen platform gebouwd met Next.js en Prisma.
 
-## Deployment op Render
+## Deployment op Render met Supabase
 
-### Automatische deployment via Blueprint
+Deze applicatie gebruikt **Supabase** als database provider. Render wordt alleen gebruikt voor hosting van de Next.js applicatie.
+
+### Stap 1: Supabase Database Configureren
+
+1. Ga naar [supabase.com](https://supabase.com) en log in of maak een account aan
+2. Maak een nieuw project aan (of gebruik een bestaand project)
+3. Ga naar **Project Settings** → **Database**
+4. Onder **Connection string** vind je de connection strings. Je hebt twee URLs nodig:
+
+   **DATABASE_URL** (Session mode - met connection pooler):
+   ```
+   postgresql://postgres.[project-ref]:[password]@aws-0-eu-central-1.pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1
+   ```
+   
+   **DIRECT_URL** (Direct connection - voor Prisma migraties):
+   ```
+   postgresql://postgres.[project-ref]:[password]@aws-0-eu-central-1.pooler.supabase.com:5432/postgres
+   ```
+
+   > **Let op**: De DATABASE_URL gebruikt poort **6543** (pooler) en de DIRECT_URL gebruikt poort **5432** (direct).
+
+### Stap 2: Deployment via Render Blueprint
 
 1. Ga naar [render.com](https://render.com) en log in met je GitHub account
 2. Klik op "New +" → "Blueprint"
 3. Selecteer deze repository `Mikeyy1405/Theorie-moerad`
 4. Render gebruikt automatisch het `render.yaml` configuratiebestand
-5. Configureer de volgende environment variables:
-   - `DATABASE_URL` - Wordt automatisch gekoppeld aan de Render PostgreSQL database
+5. **Configureer de volgende environment variables handmatig**:
+   - `DATABASE_URL` - Je Supabase Session mode connection string (poort 6543)
+   - `DIRECT_URL` - Je Supabase Direct connection string (poort 5432)
    - `NEXTAUTH_URL` - Je Render app URL (bijv. `https://theorie-moerad.onrender.com`)
    - `NEXTAUTH_SECRET` - Wordt automatisch gegenereerd
 6. Klik op "Apply" om de deployment te starten
@@ -19,12 +41,7 @@ Theorie examen platform gebouwd met Next.js en Prisma.
 ### Handmatige deployment
 
 1. Ga naar [render.com](https://render.com) en log in
-2. Maak een nieuwe PostgreSQL database aan:
-   - Klik op "New +" → "PostgreSQL"
-   - Geef een naam (bijv. `theorie-moerad-db`)
-   - Selecteer de free plan
-   - Klik op "Create Database"
-3. Maak een nieuwe Web Service aan:
+2. Maak een nieuwe Web Service aan:
    - Klik op "New +" → "Web Service"
    - Verbind deze GitHub repository
    - Configureer de instellingen:
@@ -34,12 +51,13 @@ Theorie examen platform gebouwd met Next.js en Prisma.
      - **Branch**: main
      - **Build Command**: `npm install && npm run build && npx prisma generate && npx prisma migrate deploy`
      - **Start Command**: `npm start`
-4. Voeg environment variables toe:
+3. Voeg environment variables toe:
    - `NODE_ENV`: `production`
-   - `DATABASE_URL`: Kopieer de Internal Database URL van je PostgreSQL database
+   - `DATABASE_URL`: Je Supabase Session mode connection string (poort 6543)
+   - `DIRECT_URL`: Je Supabase Direct connection string (poort 5432)
    - `NEXTAUTH_URL`: Je Render service URL
    - `NEXTAUTH_SECRET`: Genereer een random string
-5. Klik op "Create Web Service"
+4. Klik op "Create Web Service"
 
 ### Na deployment
 
@@ -50,13 +68,27 @@ De database migraties worden automatisch uitgevoerd tijdens de build. Na de eers
 
 ### Environment Variables Referentie
 
-- `NODE_ENV`: Moet `production` zijn
-- `DATABASE_URL`: PostgreSQL connection string (formaat: `postgresql://user:password@host:port/database`)
-- `NEXTAUTH_URL`: De volledige URL van je deployed applicatie
-- `NEXTAUTH_SECRET`: Een willekeurige string voor JWT encryptie (gebruik een password generator)
+| Variable | Beschrijving | Voorbeeld |
+|----------|--------------|-----------|
+| `NODE_ENV` | Moet `production` zijn | `production` |
+| `DATABASE_URL` | Supabase Session mode (poort 6543) | `postgresql://postgres.[ref]:[pwd]@...pooler.supabase.com:6543/postgres?pgbouncer=true&connection_limit=1` |
+| `DIRECT_URL` | Supabase Direct connection (poort 5432) | `postgresql://postgres.[ref]:[pwd]@...pooler.supabase.com:5432/postgres` |
+| `NEXTAUTH_URL` | De volledige URL van je deployed applicatie | `https://theorie-moerad.onrender.com` |
+| `NEXTAUTH_SECRET` | Een willekeurige string voor JWT encryptie | Gebruik een password generator |
+
+### Waarom twee database URLs?
+
+Supabase gebruikt **PgBouncer** voor connection pooling:
+- **DATABASE_URL** (poort 6543): Gebruikt connection pooling voor efficiënte database connecties in productie
+- **DIRECT_URL** (poort 5432): Directe connectie nodig voor Prisma migraties en schema wijzigingen
+
+Prisma heeft de `directUrl` nodig omdat sommige operaties (zoals migraties) niet compatibel zijn met connection poolers.
 
 ### Troubleshooting
 
-- Als de build faalt, check de build logs in het Render dashboard
-- Zorg ervoor dat alle environment variables correct zijn ingesteld
-- Voor database connectie problemen, verifieer dat `DATABASE_URL` correct is gekoppeld
+- **Build faalt**: Check de build logs in het Render dashboard
+- **Database connectie problemen**: 
+  - Verifieer dat beide `DATABASE_URL` en `DIRECT_URL` correct zijn ingesteld
+  - Controleer of de poorten correct zijn (6543 voor DATABASE_URL, 5432 voor DIRECT_URL)
+  - Zorg dat `?pgbouncer=true&connection_limit=1` is toegevoegd aan de DATABASE_URL
+- **Migratie problemen**: Controleer of de `DIRECT_URL` correct is ingesteld (poort 5432)

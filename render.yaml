@@ -10,17 +10,10 @@ services:
       - key: NODE_ENV
         value: production
       - key: DATABASE_URL
-        fromDatabase:
-          name: theorie-moerad-db
-          property: connectionString
+        sync: false
+      - key: DIRECT_URL
+        sync: false
       - key: NEXTAUTH_SECRET
         generateValue: true
       - key: NEXTAUTH_URL
         sync: false
-
-databases:
-  - name: theorie-moerad-db
-    databaseName: theorie_moerad
-    user: theorie_moerad_user
-    plan: free
-    region: frankfurt
