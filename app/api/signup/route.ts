@@ -22,7 +22,7 @@ export async function POST(request: NextRequest) {
       .from('users')
       .select('*')
       .eq('email', email)
-      .single()
+      .maybeSingle()
 
     if (existingUser) {
       return NextResponse.json(
