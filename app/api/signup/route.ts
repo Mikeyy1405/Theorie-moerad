@@ -1,7 +1,7 @@
 
 import { NextRequest, NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
-import { prisma } from '@/lib/db'
+import { supabase } from '@/lib/supabase'
 
 export const dynamic = "force-dynamic";
 
@@ -18,9 +18,11 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user already exists
-    const existingUser = await prisma.user.findUnique({
-      where: { email }
-    })
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('*')
+      .eq('email', email)
+      .single()
 
     if (existingUser) {
       return NextResponse.json(
@@ -33,23 +35,33 @@ export async function POST(request: NextRequest) {
     const hashedPassword = await bcrypt.hash(password, 12)
 
     // Create user
-    const user = await prisma.user.create({
-      data: {
+    const { data: user, error } = await supabase
+      .from('users')
+      .insert({
         email,
         password: hashedPassword,
-        firstName: firstName || null,
-        lastName: lastName || null,
+        first_name: firstName || null,
+        last_name: lastName || null,
         role: role.toUpperCase()
-      }
-    })
+      })
+      .select()
+      .single()
+
+    if (error) {
+      console.error('Signup error:', error)
+      return NextResponse.json(
+        { error: 'Er is een fout opgetreden' },
+        { status: 500 }
+      )
+    }
 
     return NextResponse.json({
       message: 'Gebruiker succesvol aangemaakt',
       user: {
         id: user.id,
         email: user.email,
-        firstName: user.firstName,
-        lastName: user.lastName,
+        firstName: user.first_name,
+        lastName: user.last_name,
         role: user.role
       }
     })
