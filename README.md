@@ -2,6 +2,65 @@
 
 Theorie examen platform gebouwd met Next.js en Prisma.
 
+## Supabase Client Configuratie
+
+Dit project bevat een Supabase client voor directe interactie met Supabase services (zoals Auth, Realtime, Storage).
+
+### API Keys Ophalen
+
+1. Ga naar [supabase.com/dashboard](https://supabase.com/dashboard) en log in
+2. Selecteer je project (of maak een nieuw project aan)
+3. Ga naar **Project Settings** → **API**
+4. Hier vind je:
+   - **Project URL** → gebruik voor `NEXT_PUBLIC_SUPABASE_URL`
+   - **anon public** key → gebruik voor `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+
+### Environment Variables Instellen
+
+Kopieer het `.env.example` bestand naar `.env` en vul de Supabase waarden in:
+
+```bash
+cp .env.example .env
+```
+
+Bewerk `.env` en voeg je Supabase credentials toe:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL="https://your-project-ref.supabase.co"
+NEXT_PUBLIC_SUPABASE_ANON_KEY="your-anon-key-here"
+```
+
+### Gebruik in de Applicatie
+
+De Supabase client is beschikbaar via `lib/supabase.ts`:
+
+```typescript
+import { supabase } from '@/lib/supabase'
+
+// Voorbeeld: data ophalen
+const { data, error } = await supabase
+  .from('your_table')
+  .select('*')
+
+// Voorbeeld: authenticatie
+const { data, error } = await supabase.auth.signInWithPassword({
+  email: 'user@example.com',
+  password: 'password'
+})
+```
+
+### Applicatie Starten
+
+```bash
+# Installeer dependencies
+npm install
+
+# Start development server
+npm run dev
+```
+
+De applicatie draait op [http://localhost:3000](http://localhost:3000).
+
 ## Deployment op Render met Supabase
 
 Deze applicatie gebruikt **Supabase** als database provider. Render wordt alleen gebruikt voor hosting van de Next.js applicatie.
@@ -75,6 +134,8 @@ De database migraties worden automatisch uitgevoerd tijdens de build. Na de eers
 | `DIRECT_URL` | Supabase Direct connection (poort 5432) | `postgresql://postgres.[ref]:[pwd]@...pooler.supabase.com:5432/postgres` |
 | `NEXTAUTH_URL` | De volledige URL van je deployed applicatie | `https://theorie-moerad.onrender.com` |
 | `NEXTAUTH_SECRET` | Een willekeurige string voor JWT encryptie | Gebruik een password generator |
+| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL voor client SDK | `https://your-project-ref.supabase.co` |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon/public key voor client SDK | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...` |
 
 ### Waarom twee database URLs?
 
