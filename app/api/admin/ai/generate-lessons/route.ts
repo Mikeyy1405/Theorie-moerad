@@ -65,7 +65,7 @@ De quiz moet bevatten:
 - Een titel (bijv. "Quiz: ${chapterTitle}")
 - 10 vragen met elk 4 antwoordopties
 - Precies 1 correct antwoord per vraag
-- Een uitleg voor elk vraag` : ''}
+- Een uitleg voor elke vraag` : ''}
 
 ${prompt ? `Extra instructies: ${prompt}` : ''}
 

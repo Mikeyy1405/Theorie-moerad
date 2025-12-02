@@ -410,7 +410,8 @@ export function CurriculumBuilder({ course }: CurriculumBuilderProps) {
     setError(null)
 
     try {
-      // Create lessons one by one
+      // Create lessons sequentially to maintain correct order_index
+      // (the API auto-increments order_index based on existing lessons)
       for (const lesson of generatedLessons.lessons) {
         const response = await fetch('/api/admin/lessons', {
           method: 'POST',
@@ -474,8 +475,8 @@ export function CurriculumBuilder({ course }: CurriculumBuilderProps) {
 
           const createdQuestion = await questionResponse.json()
 
-          // Create answers for this question
-          for (const answer of question.answers) {
+          // Create answers for this question in parallel
+          const answerPromises = question.answers.map(async (answer) => {
             const answerResponse = await fetch('/api/admin/quiz-answers', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -490,7 +491,9 @@ export function CurriculumBuilder({ course }: CurriculumBuilderProps) {
               const data = await answerResponse.json()
               throw new Error(data.error || 'Er is een fout opgetreden bij het aanmaken van het antwoord')
             }
-          }
+          })
+
+          await Promise.all(answerPromises)
         }
       }
 
