@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminAccess } from '@/lib/admin-auth'
+import { callOpenAI } from '@/lib/openai'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,31 +39,13 @@ Antwoord ALLEEN met valid JSON, geen extra tekst. Voorbeeld formaat:
   {"title": "Voorrangsregels", "description": "De regels voor voorrang op kruispunten en rotondes."}
 ]`
 
-    const response = await fetch('https://apps.abacus.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.ABACUSAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4.1-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: prompt }
-        ],
-        max_tokens: 2000,
-        temperature: 0.7
-      }),
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('AI API error:', errorText)
-      throw new Error(`AI API error: ${response.status}`)
-    }
-
-    const data = await response.json()
-    const content = data.choices?.[0]?.message?.content || ''
+    const content = await callOpenAI(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: prompt },
+      ],
+      { maxTokens: 2000, temperature: 0.7 }
+    )
 
     // Try to parse the JSON response
     let chapters: GeneratedChapter[] = []
