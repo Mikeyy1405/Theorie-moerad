@@ -1,11 +1,8 @@
 import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
 import { SessionWrapper } from '@/components/session-wrapper'
-
-const inter = Inter({ subsets: ['latin'] })
 
 export const dynamic = "force-dynamic"
 
@@ -31,7 +28,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="nl" suppressHydrationWarning>
-      <body className={inter.className} suppressHydrationWarning>
+      <body className="font-sans" suppressHydrationWarning>
         <SessionWrapper>
           <ThemeProvider
             attribute="class"
