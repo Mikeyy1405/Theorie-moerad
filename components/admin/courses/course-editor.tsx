@@ -378,14 +378,26 @@ export function CourseEditor({ course, onSuccess, onCancel }: CourseEditorProps)
                 <Switch
                   id="is_active_settings"
                   checked={formData.is_active}
-                  onCheckedChange={(checked) => {
+                  onCheckedChange={async (checked) => {
+                    const previousValue = formData.is_active
                     setFormData(prev => ({ ...prev, is_active: checked }))
                     // Auto-save the setting
-                    fetch(`/api/admin/courses/${course.id}`, {
-                      method: 'PUT',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ ...formData, is_active: checked }),
-                    })
+                    try {
+                      const response = await fetch(`/api/admin/courses/${course.id}`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ ...formData, is_active: checked }),
+                      })
+                      if (!response.ok) {
+                        // Revert on failure
+                        setFormData(prev => ({ ...prev, is_active: previousValue }))
+                        setError('Kon publicatie status niet opslaan')
+                      }
+                    } catch {
+                      // Revert on failure
+                      setFormData(prev => ({ ...prev, is_active: previousValue }))
+                      setError('Kon publicatie status niet opslaan')
+                    }
                   }}
                 />
               </div>
