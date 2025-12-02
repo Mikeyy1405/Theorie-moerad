@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { verifyAdminAccess } from '@/lib/admin-auth'
+import { callOpenAI } from '@/lib/openai'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,31 +35,13 @@ De tekst moet:
 
 Gebruik Markdown formatting voor structuur (## voor kopjes, - voor bullets, etc.).`
 
-    const response = await fetch('https://apps.abacus.ai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.ABACUSAI_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4.1-mini',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: `Schrijf een theorie les over: ${topic}` }
-        ],
-        max_tokens: 3000,
-        temperature: 0.7
-      }),
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('AI API error:', errorText)
-      throw new Error(`AI API error: ${response.status}`)
-    }
-
-    const data = await response.json()
-    const content = data.choices?.[0]?.message?.content || ''
+    const content = await callOpenAI(
+      [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: `Schrijf een theorie les over: ${topic}` },
+      ],
+      { maxTokens: 3000, temperature: 0.7 }
+    )
 
     if (!content) {
       return NextResponse.json(

@@ -26,14 +26,15 @@ export async function POST(request: NextRequest) {
       }
     ]
 
-    const response = await fetch('https://apps.abacus.ai/v1/chat/completions', {
+    // Note: This route uses streaming which requires direct fetch instead of the callOpenAI helper
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.ABACUSAI_API_KEY}`
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`
       },
       body: JSON.stringify({
-        model: 'gpt-4.1-mini',
+        model: 'gpt-4o-mini',
         messages: messages,
         stream: true,
         max_tokens: 1000,
