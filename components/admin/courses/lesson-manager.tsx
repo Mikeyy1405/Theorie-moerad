@@ -30,6 +30,8 @@ import {
   Video,
   HelpCircle,
   GripVertical,
+  Sparkles,
+  Loader2,
 } from 'lucide-react'
 import { Course, Chapter, Lesson, LessonType } from '@/types/course'
 import { QuizBuilder } from './quiz-builder'
@@ -79,6 +81,11 @@ export function LessonManager({ course, chapter, onBack }: LessonManagerProps) {
   })
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // AI generation state
+  const [showAIDialog, setShowAIDialog] = useState(false)
+  const [aiTopic, setAITopic] = useState('')
+  const [generatingAI, setGeneratingAI] = useState(false)
 
   const fetchLessons = useCallback(async () => {
     try {
@@ -410,7 +417,22 @@ export function LessonManager({ course, chapter, onBack }: LessonManagerProps) {
 
             {formData.type === 'TEXT' && (
               <div className="space-y-2">
-                <Label htmlFor="lesson-content">Inhoud</Label>
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="lesson-content">Inhoud</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setAITopic(formData.title || '')
+                      setShowAIDialog(true)
+                    }}
+                    className="border-purple-200 text-purple-600 hover:bg-purple-50"
+                  >
+                    <Sparkles className="h-3 w-3 mr-1" />
+                    Genereer met AI
+                  </Button>
+                </div>
                 <Textarea
                   id="lesson-content"
                   value={formData.content}
@@ -478,6 +500,82 @@ export function LessonManager({ course, chapter, onBack }: LessonManagerProps) {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Content Generation Dialog */}
+      <Dialog open={showAIDialog} onOpenChange={setShowAIDialog}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-purple-600" />
+              Genereer Les Inhoud met AI
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="ai-topic">Onderwerp</Label>
+              <Input
+                id="ai-topic"
+                value={aiTopic}
+                onChange={(e) => setAITopic(e.target.value)}
+                placeholder="bijv. Voorrangsregels op rotondes"
+              />
+              <p className="text-xs text-gray-500">
+                Beschrijf het onderwerp waarover je theorie tekst wilt genereren
+              </p>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button type="button" variant="outline" onClick={() => setShowAIDialog(false)}>
+              Annuleren
+            </Button>
+            <Button
+              onClick={async () => {
+                if (!aiTopic.trim()) return
+                setGeneratingAI(true)
+                try {
+                  const response = await fetch('/api/admin/ai/generate-lesson-content', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                      topic: aiTopic,
+                      chapterTitle: chapter.title,
+                      courseTitle: course.title,
+                    }),
+                  })
+                  if (response.ok) {
+                    const data = await response.json()
+                    setFormData(prev => ({ ...prev, content: data.content }))
+                    setShowAIDialog(false)
+                  } else {
+                    const data = await response.json()
+                    setError(data.error || 'Er is een fout opgetreden')
+                  }
+                } catch (err) {
+                  setError('Er is een fout opgetreden bij het genereren')
+                } finally {
+                  setGeneratingAI(false)
+                }
+              }}
+              disabled={generatingAI || !aiTopic.trim()}
+              className="bg-purple-600 hover:bg-purple-700"
+            >
+              {generatingAI ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Genereren...
+                </>
+              ) : (
+                <>
+                  <Sparkles className="h-4 w-4 mr-2" />
+                  Genereer
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
     </div>

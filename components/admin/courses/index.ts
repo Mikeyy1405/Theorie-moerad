@@ -1,5 +1,7 @@
 export { CourseList } from './course-list'
 export { CourseForm } from './course-form'
+export { CourseEditor } from './course-editor'
 export { ChapterManager } from './chapter-manager'
 export { LessonManager } from './lesson-manager'
 export { QuizBuilder } from './quiz-builder'
+export { CurriculumBuilder } from './curriculum-builder'
