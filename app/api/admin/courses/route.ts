@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-admin'
+import { verifyAdminAccess } from '@/lib/admin-auth'
 
 export const dynamic = 'force-dynamic'
 
 // GET all courses
 export async function GET() {
   try {
+    const auth = await verifyAdminAccess()
+    if (!auth.authorized) return auth.error
+    
     const supabase = createAdminClient()
     
     const { data: courses, error } = await supabase
@@ -30,6 +34,9 @@ export async function GET() {
 // POST create new course
 export async function POST(request: NextRequest) {
   try {
+    const auth = await verifyAdminAccess()
+    if (!auth.authorized) return auth.error
+    
     const supabase = createAdminClient()
     const body = await request.json()
     

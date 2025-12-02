@@ -1,11 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-admin'
+import { verifyAdminAccess } from '@/lib/admin-auth'
 
 export const dynamic = 'force-dynamic'
 
 // GET lessons (filter by chapter_id or course_id)
 export async function GET(request: NextRequest) {
   try {
+    const auth = await verifyAdminAccess()
+    if (!auth.authorized) return auth.error
+    
     const supabase = createAdminClient()
     const { searchParams } = new URL(request.url)
     const chapterId = searchParams.get('chapter_id')
@@ -41,6 +45,9 @@ export async function GET(request: NextRequest) {
 // POST create new lesson
 export async function POST(request: NextRequest) {
   try {
+    const auth = await verifyAdminAccess()
+    if (!auth.authorized) return auth.error
+    
     const supabase = createAdminClient()
     const body = await request.json()
     

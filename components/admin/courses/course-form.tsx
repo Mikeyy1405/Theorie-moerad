@@ -63,12 +63,23 @@ export function CourseForm({ course, onSuccess, onCancel }: CourseFormProps) {
         ? `/api/admin/courses/${course.id}`
         : '/api/admin/courses'
       
+      // Validate and parse price
+      let parsedPrice: number | null = null
+      if (formData.price) {
+        parsedPrice = parseFloat(formData.price as string)
+        if (isNaN(parsedPrice) || parsedPrice < 0) {
+          setError('Voer een geldige prijs in')
+          setLoading(false)
+          return
+        }
+      }
+      
       const response = await fetch(url, {
         method: course ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...formData,
-          price: formData.price ? parseFloat(formData.price as string) : null,
+          price: parsedPrice,
         }),
       })
 

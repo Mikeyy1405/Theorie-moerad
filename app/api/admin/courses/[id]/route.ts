@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase-admin'
+import { verifyAdminAccess } from '@/lib/admin-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,6 +10,9 @@ export async function GET(
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await verifyAdminAccess()
+    if (!auth.authorized) return auth.error
+    
     const supabase = createAdminClient()
     
     const { data: course, error } = await supabase
@@ -43,6 +47,9 @@ export async function PUT(
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await verifyAdminAccess()
+    if (!auth.authorized) return auth.error
+    
     const supabase = createAdminClient()
     const body = await request.json()
     
@@ -97,6 +104,9 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
+    const auth = await verifyAdminAccess()
+    if (!auth.authorized) return auth.error
+    
     const supabase = createAdminClient()
     
     const { error } = await supabase
