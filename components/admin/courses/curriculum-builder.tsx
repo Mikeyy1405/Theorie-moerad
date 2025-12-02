@@ -7,6 +7,8 @@ import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
 import { Badge } from '@/components/ui/badge'
 import { Switch } from '@/components/ui/switch'
+import { Slider } from '@/components/ui/slider'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Dialog,
   DialogContent,
@@ -43,6 +45,33 @@ interface GeneratedChapter {
   description: string
 }
 
+interface GeneratedAnswer {
+  text: string
+  isCorrect: boolean
+}
+
+interface GeneratedQuestion {
+  question: string
+  answers: GeneratedAnswer[]
+  explanation: string
+}
+
+interface GeneratedLesson {
+  title: string
+  type: 'TEXT' | 'QUIZ'
+  content?: string
+}
+
+interface GeneratedQuiz {
+  title: string
+  questions: GeneratedQuestion[]
+}
+
+interface GeneratedLessonsResponse {
+  lessons: GeneratedLesson[]
+  quiz?: GeneratedQuiz
+}
+
 const lessonTypeIcons = {
   TEXT: FileText,
   VIDEO: Video,
@@ -77,6 +106,16 @@ export function CurriculumBuilder({ course }: CurriculumBuilderProps) {
   const [generatingAI, setGeneratingAI] = useState(false)
   const [generatedChapters, setGeneratedChapters] = useState<GeneratedChapter[]>([])
   const [savingGeneratedChapters, setSavingGeneratedChapters] = useState(false)
+  
+  // AI Lessons dialog state
+  const [showAILessonsDialog, setShowAILessonsDialog] = useState(false)
+  const [selectedChapterForLessons, setSelectedChapterForLessons] = useState<Chapter | null>(null)
+  const [lessonCount, setLessonCount] = useState(3)
+  const [includeQuiz, setIncludeQuiz] = useState(false)
+  const [lessonsPrompt, setLessonsPrompt] = useState('')
+  const [generatingLessons, setGeneratingLessons] = useState(false)
+  const [generatedLessons, setGeneratedLessons] = useState<GeneratedLessonsResponse | null>(null)
+  const [savingGeneratedLessons, setSavingGeneratedLessons] = useState(false)
   
   const [error, setError] = useState<string | null>(null)
 
@@ -319,6 +358,151 @@ export function CurriculumBuilder({ course }: CurriculumBuilderProps) {
     setGeneratedChapters(prev => prev.filter((_, i) => i !== index))
   }
 
+  // AI Lessons generation handlers
+  const openAILessonsDialog = (chapter: Chapter) => {
+    setSelectedChapterForLessons(chapter)
+    setLessonCount(3)
+    setIncludeQuiz(false)
+    setLessonsPrompt('')
+    setGeneratedLessons(null)
+    setError(null)
+    setShowAILessonsDialog(true)
+  }
+
+  const handleGenerateLessons = async () => {
+    if (!selectedChapterForLessons) return
+
+    setGeneratingLessons(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/admin/ai/generate-lessons', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          chapterId: selectedChapterForLessons.id,
+          chapterTitle: selectedChapterForLessons.title,
+          courseTitle: course.title,
+          lessonCount,
+          includeQuiz,
+          prompt: lessonsPrompt,
+        }),
+      })
+
+      if (!response.ok) {
+        const data = await response.json()
+        throw new Error(data.error || 'Er is een fout opgetreden')
+      }
+
+      const data = await response.json()
+      setGeneratedLessons(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Er is een fout opgetreden')
+    } finally {
+      setGeneratingLessons(false)
+    }
+  }
+
+  const handleSaveGeneratedLessons = async () => {
+    if (!generatedLessons || !selectedChapterForLessons) return
+
+    setSavingGeneratedLessons(true)
+    setError(null)
+
+    try {
+      // Create lessons one by one
+      for (const lesson of generatedLessons.lessons) {
+        const response = await fetch('/api/admin/lessons', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            course_id: course.id,
+            chapter_id: selectedChapterForLessons.id,
+            title: lesson.title,
+            type: lesson.type,
+            content: lesson.content || null,
+            is_published: false,
+          }),
+        })
+
+        if (!response.ok) {
+          const data = await response.json()
+          throw new Error(data.error || 'Er is een fout opgetreden bij het aanmaken van de les')
+        }
+      }
+
+      // Create quiz lesson if present
+      if (generatedLessons.quiz && generatedLessons.quiz.questions.length > 0) {
+        // First create the quiz lesson
+        const lessonResponse = await fetch('/api/admin/lessons', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            course_id: course.id,
+            chapter_id: selectedChapterForLessons.id,
+            title: generatedLessons.quiz.title,
+            type: 'QUIZ',
+            content: null,
+            is_published: false,
+          }),
+        })
+
+        if (!lessonResponse.ok) {
+          const data = await lessonResponse.json()
+          throw new Error(data.error || 'Er is een fout opgetreden bij het aanmaken van de quiz')
+        }
+
+        const quizLesson = await lessonResponse.json()
+
+        // Create quiz questions and answers
+        for (const question of generatedLessons.quiz.questions) {
+          // Create question
+          const questionResponse = await fetch('/api/admin/quiz-questions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              lesson_id: quizLesson.id,
+              question: question.question,
+              explanation: question.explanation,
+            }),
+          })
+
+          if (!questionResponse.ok) {
+            const data = await questionResponse.json()
+            throw new Error(data.error || 'Er is een fout opgetreden bij het aanmaken van de vraag')
+          }
+
+          const createdQuestion = await questionResponse.json()
+
+          // Create answers for this question
+          for (const answer of question.answers) {
+            const answerResponse = await fetch('/api/admin/quiz-answers', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                question_id: createdQuestion.id,
+                answer: answer.text,
+                is_correct: answer.isCorrect,
+              }),
+            })
+
+            if (!answerResponse.ok) {
+              const data = await answerResponse.json()
+              throw new Error(data.error || 'Er is een fout opgetreden bij het aanmaken van het antwoord')
+            }
+          }
+        }
+      }
+
+      setShowAILessonsDialog(false)
+      fetchLessonsForChapter(selectedChapterForLessons.id)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Er is een fout opgetreden')
+    } finally {
+      setSavingGeneratedLessons(false)
+    }
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -436,6 +620,15 @@ export function CurriculumBuilder({ course }: CurriculumBuilderProps) {
                     >
                       {chapter.is_published ? 'Gepubliceerd' : 'Concept'}
                     </Badge>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => openAILessonsDialog(chapter)}
+                      className="text-purple-600 hover:text-purple-700 hover:bg-purple-50"
+                      title="Genereer Lessen met AI"
+                    >
+                      <Sparkles className="h-4 w-4" />
+                    </Button>
                     <Button
                       variant="ghost"
                       size="sm"
@@ -676,6 +869,163 @@ export function CurriculumBuilder({ course }: CurriculumBuilderProps) {
                     <>
                       <Plus className="h-4 w-4 mr-2" />
                       {generatedChapters.length} Hoofdstukken Toevoegen
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Lessons Generation Dialog */}
+      <Dialog open={showAILessonsDialog} onOpenChange={setShowAILessonsDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-purple-600" />
+              Lessen Genereren met AI
+            </DialogTitle>
+          </DialogHeader>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+              {error}
+            </div>
+          )}
+
+          {selectedChapterForLessons && (
+            <div className="bg-gray-50 rounded-lg p-3 mb-4">
+              <p className="text-sm text-gray-600">
+                Hoofdstuk: <span className="font-medium">{selectedChapterForLessons.title}</span>
+              </p>
+            </div>
+          )}
+
+          {!generatedLessons ? (
+            <div className="space-y-6">
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Aantal lessen: {lessonCount}</Label>
+                  <Slider
+                    value={[lessonCount]}
+                    onValueChange={(value) => setLessonCount(value[0])}
+                    min={1}
+                    max={10}
+                    step={1}
+                    className="w-full"
+                  />
+                  <p className="text-sm text-gray-500">
+                    Selecteer het aantal lessen dat gegenereerd moet worden (1-10)
+                  </p>
+                </div>
+
+                <div className="flex items-center space-x-2">
+                  <Checkbox
+                    id="include-quiz"
+                    checked={includeQuiz}
+                    onCheckedChange={(checked) => setIncludeQuiz(checked === true)}
+                  />
+                  <Label htmlFor="include-quiz">Inclusief quiz met 10 vragen</Label>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="lessons-prompt">Extra instructies (optioneel)</Label>
+                  <Textarea
+                    id="lessons-prompt"
+                    value={lessonsPrompt}
+                    onChange={(e) => setLessonsPrompt(e.target.value)}
+                    placeholder="bijv. Focus op verkeersborden voor fietsers, of voeg praktijkvoorbeelden toe..."
+                    rows={3}
+                  />
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowAILessonsDialog(false)}>
+                  Annuleren
+                </Button>
+                <Button
+                  onClick={handleGenerateLessons}
+                  disabled={generatingLessons}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  {generatingLessons ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Genereren...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Genereer Lessen
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                Bekijk de gegenereerde lessen voordat je ze opslaat:
+              </p>
+              
+              <div className="space-y-3 max-h-[400px] overflow-y-auto">
+                {generatedLessons.lessons.map((lesson, index) => (
+                  <div key={index} className="bg-gray-50 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <FileText className="h-4 w-4 text-gray-600" />
+                      <span className="font-medium">{lesson.title}</span>
+                      <Badge variant="outline" className="text-xs">
+                        {lesson.type === 'TEXT' ? 'Tekst' : 'Quiz'}
+                      </Badge>
+                    </div>
+                    {lesson.content && (
+                      <p className="text-sm text-gray-600 line-clamp-3">
+                        {lesson.content.substring(0, 200)}...
+                      </p>
+                    )}
+                  </div>
+                ))}
+                
+                {generatedLessons.quiz && (
+                  <div className="bg-purple-50 rounded-lg p-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <HelpCircle className="h-4 w-4 text-purple-600" />
+                      <span className="font-medium">{generatedLessons.quiz.title}</span>
+                      <Badge variant="outline" className="text-xs bg-purple-100">
+                        Quiz
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-gray-600">
+                      {generatedLessons.quiz.questions.length} vragen
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setGeneratedLessons(null)}
+                >
+                  Opnieuw genereren
+                </Button>
+                <Button
+                  onClick={handleSaveGeneratedLessons}
+                  disabled={savingGeneratedLessons}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {savingGeneratedLessons ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Opslaan...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Lessen Toevoegen
                     </>
                   )}
                 </Button>
