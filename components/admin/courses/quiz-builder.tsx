@@ -22,6 +22,8 @@ import {
   Check,
   X,
   ImageIcon,
+  Sparkles,
+  Loader2,
 } from 'lucide-react'
 import { Lesson, QuizQuestion, QuizAnswer } from '@/types/course'
 
@@ -45,6 +47,12 @@ interface AnswerFormData {
   is_correct: boolean
 }
 
+interface GeneratedQuestion {
+  question: string
+  explanation: string
+  answers: { answer: string; is_correct: boolean }[]
+}
+
 export function QuizBuilder({ lesson, onBack }: QuizBuilderProps) {
   const [questions, setQuestions] = useState<QuestionWithAnswers[]>([])
   const [loading, setLoading] = useState(true)
@@ -66,6 +74,14 @@ export function QuizBuilder({ lesson, onBack }: QuizBuilderProps) {
   
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  
+  // AI generation state
+  const [showAIDialog, setShowAIDialog] = useState(false)
+  const [aiTopic, setAITopic] = useState('')
+  const [aiNumQuestions, setAINumQuestions] = useState(5)
+  const [generatingAI, setGeneratingAI] = useState(false)
+  const [generatedQuestions, setGeneratedQuestions] = useState<GeneratedQuestion[]>([])
+  const [savingGenerated, setSavingGenerated] = useState(false)
 
   const fetchQuestions = useCallback(async () => {
     try {
@@ -281,13 +297,28 @@ export function QuizBuilder({ lesson, onBack }: QuizBuilderProps) {
 
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold">Vragen ({questions.length})</h3>
-        <Button
-          onClick={() => openQuestionDialog()}
-          className="bg-blue-600 hover:bg-blue-700"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Nieuwe Vraag
-        </Button>
+        <div className="flex gap-2">
+          <Button
+            variant="outline"
+            onClick={() => {
+              setAITopic(lesson.title)
+              setAINumQuestions(5)
+              setGeneratedQuestions([])
+              setShowAIDialog(true)
+            }}
+            className="border-purple-200 text-purple-600 hover:bg-purple-50"
+          >
+            <Sparkles className="h-4 w-4 mr-2" />
+            Genereer met AI
+          </Button>
+          <Button
+            onClick={() => openQuestionDialog()}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Nieuwe Vraag
+          </Button>
+        </div>
       </div>
 
       {loading ? (
@@ -299,13 +330,28 @@ export function QuizBuilder({ lesson, onBack }: QuizBuilderProps) {
           <p className="text-gray-500 mb-4">
             Nog geen vragen. Voeg je eerste vraag toe!
           </p>
-          <Button
-            onClick={() => openQuestionDialog()}
-            className="bg-blue-600 hover:bg-blue-700"
-          >
-            <Plus className="h-4 w-4 mr-2" />
-            Nieuwe Vraag
-          </Button>
+          <div className="flex gap-2 justify-center">
+            <Button
+              variant="outline"
+              onClick={() => {
+                setAITopic(lesson.title)
+                setAINumQuestions(5)
+                setGeneratedQuestions([])
+                setShowAIDialog(true)
+              }}
+              className="border-purple-200 text-purple-600 hover:bg-purple-50"
+            >
+              <Sparkles className="h-4 w-4 mr-2" />
+              Genereer met AI
+            </Button>
+            <Button
+              onClick={() => openQuestionDialog()}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              Nieuwe Vraag
+            </Button>
+          </div>
         </div>
       ) : (
         <div className="space-y-4">
@@ -542,6 +588,238 @@ export function QuizBuilder({ lesson, onBack }: QuizBuilderProps) {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* AI Quiz Generation Dialog */}
+      <Dialog open={showAIDialog} onOpenChange={setShowAIDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Sparkles className="h-5 w-5 text-purple-600" />
+              Quiz Vragen Genereren met AI
+            </DialogTitle>
+          </DialogHeader>
+
+          {error && (
+            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+              {error}
+            </div>
+          )}
+
+          {generatedQuestions.length === 0 ? (
+            <div className="space-y-4">
+              <div className="space-y-2">
+                <Label htmlFor="ai-quiz-topic">Onderwerp</Label>
+                <Input
+                  id="ai-quiz-topic"
+                  value={aiTopic}
+                  onChange={(e) => setAITopic(e.target.value)}
+                  placeholder="bijv. Voorrangsregels op kruispunten"
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="ai-num-questions">Aantal vragen</Label>
+                <Input
+                  id="ai-num-questions"
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={aiNumQuestions}
+                  onChange={(e) => setAINumQuestions(parseInt(e.target.value) || 5)}
+                />
+              </div>
+
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setShowAIDialog(false)}>
+                  Annuleren
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (!aiTopic.trim()) return
+                    setGeneratingAI(true)
+                    setError(null)
+                    try {
+                      const response = await fetch('/api/admin/ai/generate-quiz', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                          topic: aiTopic,
+                          numberOfQuestions: aiNumQuestions,
+                          lessonTitle: lesson.title,
+                        }),
+                      })
+                      if (response.ok) {
+                        const data = await response.json()
+                        setGeneratedQuestions(data.questions || [])
+                      } else {
+                        const data = await response.json()
+                        setError(data.error || 'Er is een fout opgetreden')
+                      }
+                    } catch (err) {
+                      setError('Er is een fout opgetreden bij het genereren')
+                    } finally {
+                      setGeneratingAI(false)
+                    }
+                  }}
+                  disabled={generatingAI || !aiTopic.trim()}
+                  className="bg-purple-600 hover:bg-purple-700"
+                >
+                  {generatingAI ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Genereren...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="h-4 w-4 mr-2" />
+                      Genereer
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              <p className="text-sm text-gray-600">
+                {generatedQuestions.length} vragen gegenereerd. Bekijk en pas aan voordat je opslaat:
+              </p>
+
+              <div className="space-y-4 max-h-[400px] overflow-y-auto">
+                {generatedQuestions.map((q, qIndex) => (
+                  <div key={qIndex} className="bg-gray-50 rounded-lg p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm font-medium text-gray-500">
+                        Vraag {qIndex + 1}
+                      </span>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setGeneratedQuestions(prev => prev.filter((_, i) => i !== qIndex))}
+                        className="text-red-600 hover:text-red-700 h-6 w-6 p-0"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                    <Textarea
+                      value={q.question}
+                      onChange={(e) => {
+                        setGeneratedQuestions(prev => {
+                          const updated = [...prev]
+                          updated[qIndex] = { ...updated[qIndex], question: e.target.value }
+                          return updated
+                        })
+                      }}
+                      rows={2}
+                    />
+                    <div className="space-y-2">
+                      {q.answers.map((a, aIndex) => (
+                        <div
+                          key={aIndex}
+                          className={`flex items-center gap-2 p-2 rounded ${
+                            a.is_correct ? 'bg-green-50 border border-green-200' : 'bg-white'
+                          }`}
+                        >
+                          {a.is_correct ? (
+                            <Check className="h-4 w-4 text-green-600 flex-shrink-0" />
+                          ) : (
+                            <X className="h-4 w-4 text-gray-400 flex-shrink-0" />
+                          )}
+                          <Input
+                            value={a.answer}
+                            onChange={(e) => {
+                              setGeneratedQuestions(prev => {
+                                const updated = [...prev]
+                                const answers = [...updated[qIndex].answers]
+                                answers[aIndex] = { ...answers[aIndex], answer: e.target.value }
+                                updated[qIndex] = { ...updated[qIndex], answers }
+                                return updated
+                              })
+                            }}
+                            className="h-8"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                    {q.explanation && (
+                      <div className="text-xs text-gray-500">
+                        <strong>Uitleg:</strong> {q.explanation}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setGeneratedQuestions([])}
+                >
+                  Opnieuw genereren
+                </Button>
+                <Button
+                  onClick={async () => {
+                    if (generatedQuestions.length === 0) return
+                    setSavingGenerated(true)
+                    setError(null)
+                    try {
+                      for (const q of generatedQuestions) {
+                        // Create question
+                        const qRes = await fetch('/api/admin/quiz-questions', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({
+                            lesson_id: lesson.id,
+                            question: q.question,
+                            explanation: q.explanation,
+                          }),
+                        })
+                        if (!qRes.ok) {
+                          throw new Error('Fout bij opslaan vraag')
+                        }
+                        const questionData = await qRes.json()
+
+                        // Create answers for this question
+                        for (const a of q.answers) {
+                          await fetch('/api/admin/quiz-answers', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                              question_id: questionData.id,
+                              answer: a.answer,
+                              is_correct: a.is_correct,
+                            }),
+                          })
+                        }
+                      }
+                      setShowAIDialog(false)
+                      fetchQuestions()
+                    } catch (err) {
+                      setError(err instanceof Error ? err.message : 'Er is een fout opgetreden')
+                    } finally {
+                      setSavingGenerated(false)
+                    }
+                  }}
+                  disabled={savingGenerated || generatedQuestions.length === 0}
+                  className="bg-blue-600 hover:bg-blue-700"
+                >
+                  {savingGenerated ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      Opslaan...
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="h-4 w-4 mr-2" />
+                      {generatedQuestions.length} Vragen Toevoegen
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

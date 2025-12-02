@@ -12,10 +12,9 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table'
-import { Plus, Pencil, Trash2, ChevronRight, Search } from 'lucide-react'
+import { Plus, Pencil, Trash2, Search } from 'lucide-react'
 import { Course } from '@/types/course'
-import { CourseForm } from './course-form'
-import { ChapterManager } from './chapter-manager'
+import { CourseEditor } from './course-editor'
 
 export function CourseList() {
   const [courses, setCourses] = useState<Course[]>([])
@@ -23,7 +22,6 @@ export function CourseList() {
   const [searchTerm, setSearchTerm] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [editingCourse, setEditingCourse] = useState<Course | null>(null)
-  const [selectedCourse, setSelectedCourse] = useState<Course | null>(null)
 
   const fetchCourses = useCallback(async () => {
     try {
@@ -70,18 +68,9 @@ export function CourseList() {
     (course.category && course.category.toLowerCase().includes(searchTerm.toLowerCase()))
   )
 
-  if (selectedCourse) {
-    return (
-      <ChapterManager
-        course={selectedCourse}
-        onBack={() => setSelectedCourse(null)}
-      />
-    )
-  }
-
   if (showForm || editingCourse) {
     return (
-      <CourseForm
+      <CourseEditor
         course={editingCourse}
         onSuccess={handleFormSuccess}
         onCancel={() => {
@@ -143,15 +132,7 @@ export function CourseList() {
             <TableBody>
               {filteredCourses.map((course) => (
                 <TableRow key={course.id}>
-                  <TableCell className="font-medium">
-                    <button
-                      onClick={() => setSelectedCourse(course)}
-                      className="text-left hover:text-blue-600 flex items-center"
-                    >
-                      {course.title}
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </button>
-                  </TableCell>
+                  <TableCell className="font-medium">{course.title}</TableCell>
                   <TableCell>{course.category || '-'}</TableCell>
                   <TableCell>
                     {course.price ? `€${course.price.toFixed(2)}` : 'Gratis'}
